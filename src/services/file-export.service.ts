@@ -52,7 +52,7 @@ export class FileExportService {
       { key: '总数据量', value: project.total_data },
       { key: '开始日期', value: project.start_date },
       { key: '结束日期', value: project.end_date },
-      { key: '流程模式', value: project.flow_mode === 'standard' ? '标准模式' : '标即q模式' },
+      { key: '流程链', value: (project.pipeline_roles || []).map(r => ROLE_LABELS[r] || r).join(' → ') },
       { key: '筛图环节', value: project.enable_screen ? `启用 (${project.screen_efficiency}%)` : '未启用' },
       { key: '最终有效率', value: `${project.final_efficiency}%` },
     ]);
@@ -197,7 +197,7 @@ export class FileExportService {
 
   <h2>一、项目概况</h2>
   <table>
-    <tr><th>标注类型</th><td>${project.label_type}</td><th>流程模式</th><td>${project.flow_mode === 'standard' ? '标准模式' : '标即q模式'}</td></tr>
+    <tr><th>标注类型</th><td>${project.label_type}</td><th>流程链</th><td>${(project.pipeline_roles || []).map(r => ROLE_LABELS[r] || r).join(' → ')}</td></tr>
     <tr><th>总数据量</th><td>${project.total_data.toLocaleString()} ${project.unit}</td><th>交付周期</th><td>${project.start_date} ~ ${project.end_date}</td></tr>
     <tr><th>筛图环节</th><td>${project.enable_screen ? `启用 (${project.screen_efficiency}%)` : '未启用'}</td><th>最终有效率</th><td>${project.final_efficiency}%</td></tr>
   </table>
