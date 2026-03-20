@@ -15,13 +15,14 @@ export const STANDARD_PROJECT = {
   start_date: '2026-04-01',
   end_date: '2026-04-28', // ~20 working days (Mon-Fri, no holidays)
   flow_mode: FlowMode.Standard,
+  pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
   enable_screen: false,
   screen_efficiency: null as number | null,
   final_efficiency: 100,
 };
 
 export const STANDARD_ROLE_CONFIGS: Array<{
-  role_type: RoleType;
+  role_type: string;
   daily_efficiency: number;
   base_people: number;
 }> = [
@@ -53,6 +54,7 @@ export function buildStandardPipeline(): Pipeline {
       { fromIndex: 2, toIndex: 3, gapDays: 1 },
     ],
     flowMode: FlowMode.Standard,
+    pipelineRoles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
     enableScreen: false,
     screenRate: 1,
     finalRate: 1,
