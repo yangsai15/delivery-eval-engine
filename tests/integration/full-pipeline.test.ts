@@ -31,7 +31,7 @@ describe('Full Pipeline Integration Test', () => {
 
   describe('Standard mode: create → configure → calculate → verify', () => {
     test('end-to-end staffing calculation', () => {
-      // Step 1: Create project
+      // Step 1: Create project with pipeline_roles
       const project = projectService.create({
         project_name: 'E2E Standard Test',
         label_type: '目标检测',
@@ -39,12 +39,13 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 10000,
         start_date: '2026-04-06', // Monday
         end_date: '2026-05-01',   // Friday, ~20 working days
-        flow_mode: FlowMode.Standard,
+        pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
         final_efficiency: 100,
       });
 
       expect(project.project_id).toBeTruthy();
       expect(project.status).toBe(ProjectStatus.Draft);
+      expect(project.pipeline_roles).toEqual([RoleType.Label, RoleType.QA1, RoleType.QA2]);
 
       // Step 2: Configure roles
       configService.setRoleConfig(project.project_id, {
@@ -94,7 +95,7 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 10000,
         start_date: '2026-04-06',
         end_date: '2026-05-01',
-        flow_mode: FlowMode.Standard,
+        pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
         final_efficiency: 100,
       });
 
@@ -127,7 +128,7 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 5000,
         start_date: '2026-04-06',
         end_date: '2026-05-01',
-        flow_mode: FlowMode.Standard,
+        pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
         final_efficiency: 100,
       });
 
@@ -162,11 +163,12 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 5000,
         start_date: '2026-04-06',
         end_date: '2026-04-17', // ~10 working days
-        flow_mode: FlowMode.LabelQC,
-        enable_screen: true,
+        pipeline_roles: [RoleType.Screen, RoleType.LabelQC, RoleType.QA2],
         screen_efficiency: 80,
         final_efficiency: 100,
       });
+
+      expect(project.enable_screen).toBe(true);
 
       configService.setRoleConfig(project.project_id, {
         role_type: RoleType.Screen, daily_efficiency: 200, base_people: 3,
@@ -185,8 +187,77 @@ describe('Full Pipeline Integration Test', () => {
       const { result } = calcService.runEvaluation(project.project_id);
 
       expect(result.completionRate).toBeGreaterThan(0);
-      // Effective target = 5000 * 0.8 * 1.0 = 4000
-      // completion rate should reflect this target
+    });
+  });
+
+  describe('Custom pipeline: flexible role chain', () => {
+    test('should support custom 4-role pipeline', () => {
+      const project = projectService.create({
+        project_name: 'Custom Pipeline Test',
+        label_type: '目标检测',
+        unit: '条',
+        total_data: 5000,
+        start_date: '2026-04-06',
+        end_date: '2026-05-01',
+        pipeline_roles: ['screen', 'label', 'review', 'acceptance'],
+        screen_efficiency: 80,
+        final_efficiency: 100,
+      });
+
+      expect(project.pipeline_roles).toEqual(['screen', 'label', 'review', 'acceptance']);
+      expect(project.enable_screen).toBe(true);
+
+      configService.setRoleConfig(project.project_id, {
+        role_type: 'screen', daily_efficiency: 200, base_people: 3,
+      });
+      configService.setRoleConfig(project.project_id, {
+        role_type: 'label', daily_efficiency: 100, base_people: 5,
+      });
+      configService.setRoleConfig(project.project_id, {
+        role_type: 'review', daily_efficiency: 80, base_people: 3,
+      });
+      configService.setRoleConfig(project.project_id, {
+        role_type: 'acceptance', daily_efficiency: 150, base_people: 2,
+      });
+      configService.setFlowConfigs(project.project_id, [
+        { flow_node: 'screen→label', interval_days: 1 },
+        { flow_node: 'label→review', interval_days: 0.5 },
+        { flow_node: 'review→acceptance', interval_days: 1 },
+      ]);
+
+      const { result } = calcService.runEvaluation(project.project_id);
+
+      expect(result.completionRate).toBeGreaterThan(0);
+      expect(result.estimatedFinishDay).toBeGreaterThan(0);
+    });
+
+    test('should support minimal 2-role pipeline', () => {
+      const project = projectService.create({
+        project_name: 'Minimal Pipeline Test',
+        label_type: '文本分类',
+        unit: '条',
+        total_data: 3000,
+        start_date: '2026-04-06',
+        end_date: '2026-04-17',
+        pipeline_roles: ['label', 'qa2'],
+        final_efficiency: 100,
+      });
+
+      expect(project.pipeline_roles).toEqual(['label', 'qa2']);
+      expect(project.enable_screen).toBe(false);
+
+      configService.setRoleConfig(project.project_id, {
+        role_type: 'label', daily_efficiency: 100, base_people: 5,
+      });
+      configService.setRoleConfig(project.project_id, {
+        role_type: 'qa2', daily_efficiency: 100, base_people: 5,
+      });
+      configService.setFlowConfigs(project.project_id, [
+        { flow_node: 'label→qa2', interval_days: 1 },
+      ]);
+
+      const { result } = calcService.runStaffing(project.project_id);
+      expect(result.feasibility).toBe('feasible');
     });
   });
 
@@ -199,7 +270,7 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 1000,
         start_date: '2026-04-06',
         end_date: '2026-04-17',
-        flow_mode: FlowMode.Standard,
+        pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
         final_efficiency: 100,
       });
 
@@ -228,7 +299,7 @@ describe('Full Pipeline Integration Test', () => {
       expect(p?.status).toBe(ProjectStatus.Configured);
     });
 
-    test('clone project should copy all configs', () => {
+    test('clone project should copy all configs including pipeline_roles', () => {
       const original = projectService.create({
         project_name: 'Original',
         label_type: '测试',
@@ -236,7 +307,7 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 1000,
         start_date: '2026-04-06',
         end_date: '2026-04-17',
-        flow_mode: FlowMode.Standard,
+        pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
         final_efficiency: 100,
       });
 
@@ -252,6 +323,7 @@ describe('Full Pipeline Integration Test', () => {
       expect(clone.project_name).toContain('副本');
       expect(clone.status).toBe(ProjectStatus.Draft);
       expect(clone.total_data).toBe(1000);
+      expect(clone.pipeline_roles).toEqual([RoleType.Label, RoleType.QA1, RoleType.QA2]);
 
       const cloneRoles = configService.getRoleConfigs(clone.project_id);
       expect(cloneRoles.length).toBe(1);
@@ -270,7 +342,7 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 1000,
         start_date: '2026-04-06',
         end_date: '2026-04-17',
-        flow_mode: FlowMode.Standard,
+        pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
         final_efficiency: 100,
       });
 
@@ -286,51 +358,39 @@ describe('Full Pipeline Integration Test', () => {
   });
 
   describe('Validation integration', () => {
-    test('should reject wrong role type for flow mode', () => {
-      const project = projectService.create({
-        project_name: 'Validation Test',
-        label_type: '测试',
-        unit: '条',
-        total_data: 1000,
-        start_date: '2026-04-06',
-        end_date: '2026-04-17',
-        flow_mode: FlowMode.Standard,
-        final_efficiency: 100,
-      });
-
-      // Try to set label_qc role in standard mode → should throw
+    test('should reject pipeline_roles with less than 2 roles', () => {
       expect(() => {
-        configService.setRoleConfig(project.project_id, {
-          role_type: RoleType.LabelQC,
-          daily_efficiency: 100,
-          base_people: 5,
+        projectService.create({
+          project_name: 'Bad Pipeline',
+          label_type: '测试',
+          unit: '条',
+          total_data: 1000,
+          start_date: '2026-04-06',
+          end_date: '2026-04-17',
+          pipeline_roles: ['label'],
+          final_efficiency: 100,
         });
       }).toThrow();
     });
 
-    test('should reject wrong flow node for flow mode', () => {
-      const project = projectService.create({
-        project_name: 'Flow Validation Test',
-        label_type: '测试',
-        unit: '条',
-        total_data: 1000,
-        start_date: '2026-04-06',
-        end_date: '2026-04-17',
-        flow_mode: FlowMode.Standard,
-        final_efficiency: 100,
-      });
-
-      // Try to set label_qc→qa2 flow in standard mode → should throw
+    test('should reject duplicate roles in pipeline', () => {
       expect(() => {
-        configService.setFlowConfigs(project.project_id, [
-          { flow_node: 'label_qc→qa2', interval_days: 1 },
-        ]);
+        projectService.create({
+          project_name: 'Dup Pipeline',
+          label_type: '测试',
+          unit: '条',
+          total_data: 1000,
+          start_date: '2026-04-06',
+          end_date: '2026-04-17',
+          pipeline_roles: ['label', 'label'],
+          final_efficiency: 100,
+        });
       }).toThrow();
     });
   });
 
   describe('Export', () => {
-    test('should export project data as JSON', () => {
+    test('should export project data as JSON with pipeline_roles', () => {
       const project = projectService.create({
         project_name: 'Export Test',
         label_type: '测试',
@@ -338,13 +398,14 @@ describe('Full Pipeline Integration Test', () => {
         total_data: 1000,
         start_date: '2026-04-06',
         end_date: '2026-04-17',
-        flow_mode: FlowMode.Standard,
+        pipeline_roles: [RoleType.Label, RoleType.QA1, RoleType.QA2],
         final_efficiency: 100,
       });
 
       const exported = exportService.exportProject(project.project_id);
 
       expect(exported.project.project_name).toBe('Export Test');
+      expect(exported.project.pipeline_roles).toEqual([RoleType.Label, RoleType.QA1, RoleType.QA2]);
       expect(exported.configuration).toBeDefined();
       expect(exported.exported_at).toBeTruthy();
     });
