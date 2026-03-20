@@ -64,6 +64,7 @@ export {
   validateProjectInput,
   validateRoleConfig,
   validateFlowConfig,
+  validatePipelineRoles,
   validateRoleTypeForMode,
   validateFlowNodeForMode,
   validateStageCoverage,
