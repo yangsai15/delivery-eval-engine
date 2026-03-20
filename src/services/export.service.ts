@@ -16,6 +16,7 @@ export interface ExportData {
     start_date: string;
     end_date: string;
     flow_mode: string;
+    pipeline_roles: string[];
     enable_screen: boolean;
     final_efficiency: number;
   };
@@ -76,6 +77,7 @@ export class ExportService {
         start_date: project.start_date,
         end_date: project.end_date,
         flow_mode: project.flow_mode,
+        pipeline_roles: project.pipeline_roles,
         enable_screen: project.enable_screen,
         final_efficiency: project.final_efficiency,
       },
