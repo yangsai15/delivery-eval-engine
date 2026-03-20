@@ -12,6 +12,7 @@ interface ProjectRow {
   start_date: string;
   end_date: string;
   flow_mode: string;
+  pipeline_roles: string | null;
   enable_screen: number;
   screen_efficiency: number | null;
   final_efficiency: number;
@@ -37,6 +38,7 @@ export class ProjectRepository extends BaseRepository {
     return {
       ...row,
       flow_mode: row.flow_mode as FlowMode,
+      pipeline_roles: this.parseJSON<string[]>(row.pipeline_roles ?? '[]') ?? [],
       status: row.status as ProjectStatus,
       enable_screen: this.toBool(row.enable_screen),
       enable_overtime: this.toBool(row.enable_overtime),
@@ -55,12 +57,12 @@ export class ProjectRepository extends BaseRepository {
     const stmt = this.db.prepare(`
       INSERT INTO project (
         project_id, project_name, label_type, unit, total_data,
-        start_date, end_date, flow_mode, enable_screen, screen_efficiency,
+        start_date, end_date, flow_mode, pipeline_roles, enable_screen, screen_efficiency,
         final_efficiency, enable_overtime, enable_cost, warn_threshold,
         calendar_id, status, create_time, update_time, remark
       ) VALUES (
         ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?, ?
       )
@@ -68,6 +70,7 @@ export class ProjectRepository extends BaseRepository {
     stmt.run(
       id, input.project_name, input.label_type, input.unit, input.total_data,
       input.start_date, input.end_date, input.flow_mode,
+      this.toJSON(input.pipeline_roles),
       this.fromBool(input.enable_screen), input.screen_efficiency,
       input.final_efficiency, this.fromBool(input.enable_overtime),
       this.fromBool(input.enable_cost), this.toJSON(input.warn_threshold),
@@ -114,6 +117,7 @@ export class ProjectRepository extends BaseRepository {
       total_data: v => v,
       start_date: v => v,
       end_date: v => v,
+      pipeline_roles: v => this.toJSON(v),
       enable_screen: v => this.fromBool(v as boolean),
       screen_efficiency: v => v,
       final_efficiency: v => v,
