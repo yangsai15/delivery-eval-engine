@@ -2,12 +2,21 @@
 // 数据标注需求交付评估计算工具 - 前端应用
 // ==========================================
 
-const FLOW_MODE_LABELS = { standard: '标准模式', label_qc: '标即q模式' };
 const STATUS_LABELS = { draft: '草稿', configured: '已配置', calculated: '已测算', archived: '已归档' };
 const ROLE_LABELS = { screen: '筛图员', label: '标注员', qa1: '质检员', label_qc: '标即q', qa2: '验收员' };
+const PRESET_ROLES = [
+  { key: 'screen', label: '筛图员' },
+  { key: 'label', label: '标注员' },
+  { key: 'qa1', label: '质检员' },
+  { key: 'label_qc', label: '标即q' },
+  { key: 'qa2', label: '验收员' },
+];
 
 let currentProject = null;
 let currentTab = 'basic';
+
+// Pipeline roles editor state for new project modal
+let npPipelineRoles = [];
 
 // ========== Navigation ==========
 document.querySelectorAll('.nav-item').forEach(btn => {
@@ -56,6 +65,23 @@ document.getElementById('modal-overlay').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeModal();
 });
 
+// ========== Utility ==========
+function escHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function getRoleLabel(roleKey) {
+  return ROLE_LABELS[roleKey] || roleKey;
+}
+
+function formatPipelineRoles(roles) {
+  if (!roles || roles.length === 0) return '未设置';
+  return roles.map(r => getRoleLabel(r)).join(' → ');
+}
+
 // ========== Projects ==========
 async function loadProjects() {
   try {
@@ -76,9 +102,9 @@ async function loadProjects() {
         <div class="card-title">${escHtml(p.project_name)}</div>
         <div class="card-meta">
           <span class="badge badge-${p.status}">${STATUS_LABELS[p.status] || p.status}</span>
-          <span class="badge badge-${p.flow_mode}">${FLOW_MODE_LABELS[p.flow_mode] || p.flow_mode}</span>
         </div>
         <div class="card-stats">
+          <div class="card-stat">流程链: <span>${formatPipelineRoles(p.pipeline_roles)}</span></div>
           <div class="card-stat">数据量: <span>${p.total_data.toLocaleString()}</span> ${escHtml(p.unit)}</div>
           <div class="card-stat">周期: <span>${p.start_date} ~ ${p.end_date}</span></div>
         </div>
@@ -93,8 +119,89 @@ async function loadProjects() {
   }
 }
 
+// ========== Pipeline Roles Editor ==========
+function renderPipelineEditor() {
+  const listEl = document.getElementById('np-pipeline-list');
+  if (!listEl) return;
+
+  if (npPipelineRoles.length === 0) {
+    listEl.innerHTML = '<div style="color:var(--text-light);padding:8px">请从下方按钮添加角色到流程链</div>';
+  } else {
+    listEl.innerHTML = npPipelineRoles.map((role, idx) => `
+      <div class="pipeline-item" draggable="true" data-idx="${idx}"
+           style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:#f5f7fa;border-radius:6px;margin-bottom:4px;cursor:move">
+        <span style="color:var(--text-light);font-size:12px;min-width:20px">${idx + 1}.</span>
+        <span style="flex:1;font-weight:500">${getRoleLabel(role)}</span>
+        ${idx === 0 && role === 'screen' ? '<span class="badge" style="font-size:10px;background:#E8F5E9;color:#2E7D32">R_screen</span>' : ''}
+        ${idx === npPipelineRoles.length - 1 ? '<span class="badge" style="font-size:10px;background:#E3F2FD;color:#1565C0">R_final</span>' : ''}
+        <button class="btn btn-sm btn-ghost" onclick="movePipelineRole(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} style="padding:2px 6px">↑</button>
+        <button class="btn btn-sm btn-ghost" onclick="movePipelineRole(${idx}, 1)" ${idx === npPipelineRoles.length - 1 ? 'disabled' : ''} style="padding:2px 6px">↓</button>
+        <button class="btn btn-sm btn-ghost" onclick="removePipelineRole(${idx})" style="padding:2px 6px;color:#E53935">×</button>
+      </div>
+    `).join('');
+    // Add arrow connectors
+    if (npPipelineRoles.length > 1) {
+      const items = listEl.querySelectorAll('.pipeline-item');
+      for (let i = 0; i < items.length - 1; i++) {
+        const arrow = document.createElement('div');
+        arrow.style.cssText = 'text-align:center;color:var(--text-light);font-size:14px;margin:0 0 2px 0';
+        arrow.textContent = '↓';
+        items[i].after(arrow);
+      }
+    }
+  }
+
+  // Update screen efficiency visibility
+  const screenEffGroup = document.getElementById('np-screen-eff-group');
+  if (screenEffGroup) {
+    screenEffGroup.style.display = (npPipelineRoles.length > 0 && npPipelineRoles[0] === 'screen') ? 'block' : 'none';
+  }
+
+  // Update counter
+  const counterEl = document.getElementById('np-pipeline-count');
+  if (counterEl) {
+    counterEl.textContent = `${npPipelineRoles.length} 个角色`;
+    counterEl.style.color = npPipelineRoles.length < 2 ? '#E53935' : 'var(--text-light)';
+  }
+}
+
+function addPipelineRole(roleKey) {
+  if (npPipelineRoles.includes(roleKey)) {
+    showToast('该角色已在流程链中', 'warning');
+    return;
+  }
+  npPipelineRoles.push(roleKey);
+  renderPipelineEditor();
+}
+
+function addCustomPipelineRole() {
+  const input = document.getElementById('np-custom-role');
+  if (!input) return;
+  const value = input.value.trim();
+  if (!value) { showToast('请输入角色名称', 'warning'); return; }
+  if (npPipelineRoles.includes(value)) { showToast('该角色已在流程链中', 'warning'); return; }
+  npPipelineRoles.push(value);
+  input.value = '';
+  renderPipelineEditor();
+}
+
+function removePipelineRole(idx) {
+  npPipelineRoles.splice(idx, 1);
+  renderPipelineEditor();
+}
+
+function movePipelineRole(idx, direction) {
+  const newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= npPipelineRoles.length) return;
+  const temp = npPipelineRoles[idx];
+  npPipelineRoles[idx] = npPipelineRoles[newIdx];
+  npPipelineRoles[newIdx] = temp;
+  renderPipelineEditor();
+}
+
 // New Project
 document.getElementById('btn-new-project').addEventListener('click', () => {
+  npPipelineRoles = [];
   showModal('新建项目', `
     <div class="form-group">
       <label class="form-label">项目名称 *</label>
@@ -115,13 +222,6 @@ document.getElementById('btn-new-project').addEventListener('click', () => {
         <label class="form-label">总原始数据量 *</label>
         <input class="form-input" id="np-total" type="number" min="1" placeholder="10000">
       </div>
-      <div class="form-group">
-        <label class="form-label">流程模式 *</label>
-        <select class="form-select" id="np-mode">
-          <option value="standard">标准模式（标注→质检→验收）</option>
-          <option value="label_qc">标即q模式（标即q→验收）</option>
-        </select>
-      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -133,16 +233,30 @@ document.getElementById('btn-new-project').addEventListener('click', () => {
         <input class="form-input" id="np-end" type="date">
       </div>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">
-          <input type="checkbox" id="np-screen"> 启用筛图环节
-        </label>
+
+    <div class="form-group" style="margin-top:12px">
+      <label class="form-label">流程链配置 * <span id="np-pipeline-count" style="font-size:12px;color:var(--text-light)">0 个角色</span></label>
+      <p style="margin-bottom:8px;color:var(--text-light);font-size:13px">点击预设角色添加到流程链，或输入自定义角色名。至少需要2个角色。</p>
+
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        ${PRESET_ROLES.map(r => `
+          <button class="btn btn-sm btn-secondary" onclick="addPipelineRole('${r.key}')" type="button">+ ${r.label}</button>
+        `).join('')}
       </div>
-      <div class="form-group" id="np-screen-eff-group" style="display:none">
-        <label class="form-label">筛图有效率(%)</label>
-        <input class="form-input" id="np-screen-eff" type="number" min="1" max="100" value="80">
+
+      <div style="display:flex;gap:6px;margin-bottom:10px">
+        <input class="form-input" id="np-custom-role" placeholder="自定义角色名" style="flex:1">
+        <button class="btn btn-sm btn-secondary" onclick="addCustomPipelineRole()" type="button">添加</button>
       </div>
+
+      <div id="np-pipeline-list" style="border:1px solid #e1e8ed;border-radius:8px;padding:8px;min-height:40px">
+        <div style="color:var(--text-light);padding:8px">请从上方按钮添加角色到流程链</div>
+      </div>
+    </div>
+
+    <div class="form-group" id="np-screen-eff-group" style="display:none">
+      <label class="form-label">筛图有效率(%)</label>
+      <input class="form-input" id="np-screen-eff" type="number" min="1" max="100" value="80">
     </div>
     <div class="form-group">
       <label class="form-label">最终交付有效率(%)</label>
@@ -156,24 +270,27 @@ document.getElementById('btn-new-project').addEventListener('click', () => {
     <button class="btn btn-ghost" onclick="closeModal()">取消</button>
     <button class="btn btn-primary" onclick="createProject()">创建</button>
   `);
-
-  document.getElementById('np-screen').addEventListener('change', (e) => {
-    document.getElementById('np-screen-eff-group').style.display = e.target.checked ? 'block' : 'none';
-  });
 });
 
 async function createProject() {
   try {
+    if (npPipelineRoles.length < 2) {
+      showToast('流程链至少需要2个角色', 'warning');
+      return;
+    }
+
+    const enableScreen = npPipelineRoles[0] === 'screen';
+
     const input = {
       project_name: document.getElementById('np-name').value.trim(),
       label_type: document.getElementById('np-type').value.trim(),
       unit: document.getElementById('np-unit').value.trim(),
       total_data: parseInt(document.getElementById('np-total').value),
-      flow_mode: document.getElementById('np-mode').value,
+      pipeline_roles: npPipelineRoles,
       start_date: document.getElementById('np-start').value,
       end_date: document.getElementById('np-end').value,
-      enable_screen: document.getElementById('np-screen').checked,
-      screen_efficiency: document.getElementById('np-screen').checked
+      enable_screen: enableScreen,
+      screen_efficiency: enableScreen
         ? parseFloat(document.getElementById('np-screen-eff').value) : undefined,
       final_efficiency: parseFloat(document.getElementById('np-final-eff').value),
       remark: document.getElementById('np-remark').value.trim() || undefined,
@@ -238,7 +355,7 @@ function renderBasicTab(el) {
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">标注类型</label><div class="form-input" style="background:#f8f9fa">${escHtml(p.label_type)}</div></div>
-      <div class="form-group"><label class="form-label">流程模式</label><div><span class="badge badge-${p.flow_mode}">${FLOW_MODE_LABELS[p.flow_mode]}</span></div></div>
+      <div class="form-group"><label class="form-label">流程链</label><div class="form-input" style="background:#f8f9fa">${formatPipelineRoles(p.pipeline_roles)}</div></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">总数据量</label><div class="form-input" style="background:#f8f9fa">${p.total_data.toLocaleString()} ${escHtml(p.unit)}</div></div>
@@ -254,11 +371,13 @@ function renderBasicTab(el) {
 
 async function renderFlowTab(el) {
   const flows = await window.api.getFlowConfigs(currentProject.project_id);
-  const isStd = currentProject.flow_mode === 'standard';
-  const hasScreen = currentProject.enable_screen;
+  const pipelineRoles = currentProject.pipeline_roles || [];
 
-  let nodes = isStd ? ['label→qa1', 'qa1→qa2'] : ['label_qc→qa2'];
-  if (hasScreen) nodes.unshift(isStd ? 'screen→label' : 'screen→label_qc');
+  // Build flow nodes from pipeline_roles
+  const nodes = [];
+  for (let i = 0; i < pipelineRoles.length - 1; i++) {
+    nodes.push(`${pipelineRoles[i]}→${pipelineRoles[i + 1]}`);
+  }
 
   const flowMap = {};
   flows.forEach(f => { flowMap[f.flow_node] = f.interval_days; });
@@ -268,7 +387,7 @@ async function renderFlowTab(el) {
     <p style="margin-bottom:16px;color:var(--text-light)">设置各环节之间的流转间隔天数（支持0.5精度）</p>
     ${nodes.map(node => `
       <div class="form-group">
-        <label class="form-label">${node.replace('→', ' → ')}</label>
+        <label class="form-label">${node.split('→').map(r => getRoleLabel(r)).join(' → ')}</label>
         <input class="form-input" id="flow-${node}" type="number" min="0" step="0.5" value="${flowMap[node] ?? 1}" style="max-width:200px">
         <span class="form-hint">天</span>
       </div>
@@ -281,10 +400,11 @@ async function renderFlowTab(el) {
 
 async function saveFlows() {
   try {
-    const isStd = currentProject.flow_mode === 'standard';
-    const hasScreen = currentProject.enable_screen;
-    let nodes = isStd ? ['label→qa1', 'qa1→qa2'] : ['label_qc→qa2'];
-    if (hasScreen) nodes.unshift(isStd ? 'screen→label' : 'screen→label_qc');
+    const pipelineRoles = currentProject.pipeline_roles || [];
+    const nodes = [];
+    for (let i = 0; i < pipelineRoles.length - 1; i++) {
+      nodes.push(`${pipelineRoles[i]}→${pipelineRoles[i + 1]}`);
+    }
 
     const configs = nodes.map(node => ({
       flow_node: node,
@@ -300,11 +420,7 @@ async function saveFlows() {
 
 async function renderRolesTab(el) {
   const roles = await window.api.getRoleConfigs(currentProject.project_id);
-  const isStd = currentProject.flow_mode === 'standard';
-  const hasScreen = currentProject.enable_screen;
-
-  let roleTypes = isStd ? ['label', 'qa1', 'qa2'] : ['label_qc', 'qa2'];
-  if (hasScreen) roleTypes.unshift('screen');
+  const pipelineRoles = currentProject.pipeline_roles || [];
 
   const roleMap = {};
   roles.forEach(r => { roleMap[r.role_type] = r; });
@@ -314,10 +430,10 @@ async function renderRolesTab(el) {
     <table class="data-table">
       <thead><tr><th>角色</th><th>单人日效</th><th>配置人数</th><th>操作</th></tr></thead>
       <tbody>
-        ${roleTypes.map(rt => {
+        ${pipelineRoles.map(rt => {
           const r = roleMap[rt];
           return `<tr>
-            <td><strong>${ROLE_LABELS[rt] || rt}</strong></td>
+            <td><strong>${getRoleLabel(rt)}</strong></td>
             <td><input class="form-input" id="role-eff-${rt}" type="number" min="1" value="${r?.daily_efficiency || 100}" style="width:100px"></td>
             <td><input class="form-input" id="role-ppl-${rt}" type="number" min="1" value="${r?.base_people || 5}" style="width:100px"></td>
             <td><button class="btn btn-sm btn-primary" onclick="saveRole('${rt}')">保存</button></td>
@@ -335,7 +451,7 @@ async function saveRole(roleType) {
       daily_efficiency: parseFloat(document.getElementById(`role-eff-${roleType}`).value),
       base_people: parseInt(document.getElementById(`role-ppl-${roleType}`).value),
     });
-    showToast(`${ROLE_LABELS[roleType]}配置已保存`);
+    showToast(`${getRoleLabel(roleType)}配置已保存`);
   } catch (err) {
     showToast('保存失败: ' + err.message, 'error');
   }
@@ -343,10 +459,7 @@ async function saveRole(roleType) {
 
 async function renderOvertimeTab(el) {
   const overtimes = await window.api.getOvertimeConfigs(currentProject.project_id);
-  const isStd = currentProject.flow_mode === 'standard';
-  const hasScreen = currentProject.enable_screen;
-  let roleTypes = isStd ? ['label', 'qa1', 'qa2'] : ['label_qc', 'qa2'];
-  if (hasScreen) roleTypes.unshift('screen');
+  const pipelineRoles = currentProject.pipeline_roles || [];
 
   el.innerHTML = `
     <h3 style="margin-bottom:16px;">加班配置</h3>
@@ -354,7 +467,7 @@ async function renderOvertimeTab(el) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">角色</label>
-        <select class="form-select" id="ot-role">${roleTypes.map(r => `<option value="${r}">${ROLE_LABELS[r]}</option>`).join('')}</select>
+        <select class="form-select" id="ot-role">${pipelineRoles.map(r => `<option value="${r}">${getRoleLabel(r)}</option>`).join('')}</select>
       </div>
       <div class="form-group">
         <label class="form-label">加班日期</label>
@@ -380,7 +493,7 @@ async function renderOvertimeTab(el) {
     ${overtimes.length === 0 ? '<p style="color:var(--text-light)">暂无加班记录</p>' : `
     <table class="data-table">
       <thead><tr><th>角色</th><th>日期</th><th>时长</th><th>类型</th></tr></thead>
-      <tbody>${overtimes.map(o => `<tr><td>${ROLE_LABELS[o.role_type] || o.role_type}</td><td>${o.overtime_date}</td><td>${o.overtime_days}天</td><td>${o.date_type}</td></tr>`).join('')}</tbody>
+      <tbody>${overtimes.map(o => `<tr><td>${getRoleLabel(o.role_type)}</td><td>${o.overtime_date}</td><td>${o.overtime_days}天</td><td>${o.date_type}</td></tr>`).join('')}</tbody>
     </table>`}
   `;
 }
@@ -406,10 +519,7 @@ async function addOvertime() {
 
 async function renderCostTab(el) {
   const costs = await window.api.getCostConfigs(currentProject.project_id);
-  const isStd = currentProject.flow_mode === 'standard';
-  const hasScreen = currentProject.enable_screen;
-  let roleTypes = isStd ? ['label', 'qa1', 'qa2'] : ['label_qc', 'qa2'];
-  if (hasScreen) roleTypes.unshift('screen');
+  const pipelineRoles = currentProject.pipeline_roles || [];
 
   el.innerHTML = `
     <h3 style="margin-bottom:16px;">成本配置</h3>
@@ -417,7 +527,7 @@ async function renderCostTab(el) {
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">角色</label>
-        <select class="form-select" id="cost-role">${roleTypes.map(r => `<option value="${r}">${ROLE_LABELS[r]}</option>`).join('')}</select>
+        <select class="form-select" id="cost-role">${pipelineRoles.map(r => `<option value="${r}">${getRoleLabel(r)}</option>`).join('')}</select>
       </div>
       <div class="form-group">
         <label class="form-label">用工类型</label>
@@ -443,7 +553,7 @@ async function renderCostTab(el) {
     ${costs.length === 0 ? '<p style="color:var(--text-light)">暂无成本配置</p>' : `
     <table class="data-table">
       <thead><tr><th>角色</th><th>用工类型</th><th>日薪</th><th>人数</th></tr></thead>
-      <tbody>${costs.map(c => `<tr><td>${ROLE_LABELS[c.role_type] || c.role_type}</td><td>${c.work_type}</td><td>¥${c.daily_salary}</td><td>${c.people_num}人</td></tr>`).join('')}</tbody>
+      <tbody>${costs.map(c => `<tr><td>${getRoleLabel(c.role_type)}</td><td>${c.work_type}</td><td>¥${c.daily_salary}</td><td>${c.people_num}人</td></tr>`).join('')}</tbody>
     </table>`}
   `;
 }
@@ -483,7 +593,7 @@ async function renderResultsTab(el) {
       const ppl = r.recommended_people || r.recommendedPeople;
       html += Object.entries(ppl).map(([role, num]) => `
         <div class="result-card">
-          <div class="result-label">${ROLE_LABELS[role] || role} 推荐人数</div>
+          <div class="result-label">${getRoleLabel(role)} 推荐人数</div>
           <div class="result-value">${num}<span class="result-unit">人</span></div>
         </div>
       `).join('');
@@ -521,7 +631,7 @@ async function renderResultsTab(el) {
       const bn = r.bottleneckRole || r.bottleneck_role;
       html += `<div class="result-card warning">
         <div class="result-label">瓶颈环节</div>
-        <div class="result-value" style="font-size:18px">${ROLE_LABELS[bn] || bn}</div>
+        <div class="result-value" style="font-size:18px">${getRoleLabel(bn)}</div>
       </div>`;
     }
 
@@ -745,14 +855,6 @@ document.getElementById('btn-optimize')?.addEventListener('click', async () => {
     showToast('优化失败: ' + err.message, 'error');
   }
 });
-
-// ========== Utility ==========
-function escHtml(str) {
-  if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
 
 // ========== Init ==========
 loadProjects();
