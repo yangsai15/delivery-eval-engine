@@ -117,18 +117,52 @@ export function validateFlowConfig(config: {
 }
 
 /**
- * DC-01: role_type matches flow_mode.
+ * Validate pipeline_roles array.
+ * - Must have at least 2 roles
+ * - No duplicate role names
+ * - If first role is 'screen', it's valid (screen stage auto-applied)
  */
-export function validateRoleTypeForMode(roleType: RoleType, flowMode: FlowMode): boolean {
+export function validatePipelineRoles(pipelineRoles: string[]): ValidationResult {
+  const errors: AppError[] = [];
+  const warnings: AppError[] = [];
+
+  if (!Array.isArray(pipelineRoles) || pipelineRoles.length < 2) {
+    errors.push(new AppError(ErrorCode.E1011, '流程链至少需要2个角色'));
+  }
+
+  if (pipelineRoles.length > 0) {
+    const seen = new Set<string>();
+    for (const role of pipelineRoles) {
+      if (!role || typeof role !== 'string' || role.trim() === '') {
+        errors.push(new AppError(ErrorCode.E1011, '角色名称不可为空'));
+        break;
+      }
+      if (seen.has(role)) {
+        errors.push(new AppError(ErrorCode.E1011, `角色 ${role} 在流程链中重复`));
+        break;
+      }
+      seen.add(role);
+    }
+  }
+
+  return { valid: errors.length === 0, errors, warnings };
+}
+
+/**
+ * DC-01: role_type matches flow_mode.
+ * @deprecated Use validatePipelineRoles instead for flexible pipeline mode.
+ */
+export function validateRoleTypeForMode(roleType: string, flowMode: FlowMode): boolean {
   const standardRoles = [RoleType.Screen, RoleType.Label, RoleType.QA1, RoleType.QA2];
   const labelQcRoles = [RoleType.Screen, RoleType.LabelQC, RoleType.QA2];
 
-  if (flowMode === FlowMode.Standard) return standardRoles.includes(roleType);
-  return labelQcRoles.includes(roleType);
+  if (flowMode === FlowMode.Standard) return standardRoles.includes(roleType as RoleType);
+  return labelQcRoles.includes(roleType as RoleType);
 }
 
 /**
  * DC-02: flow_node matches flow_mode.
+ * @deprecated Use validatePipelineRoles instead for flexible pipeline mode.
  */
 export function validateFlowNodeForMode(flowNode: string, flowMode: FlowMode): boolean {
   const standardNodes = ['screen→label', 'label→qa1', 'qa1→qa2'];
@@ -229,6 +263,7 @@ export function validateGapSum(flowConfigs: FlowConfig[], workingDays: number): 
 /**
  * Comprehensive pre-calculation validation.
  * Checks all required configs are present (E2005).
+ * Uses pipeline_roles for role validation instead of flow_mode.
  */
 export function validateCalculationReady(
   project: Project,
@@ -251,25 +286,16 @@ export function validateCalculationReady(
     warnings.push(new AppError(ErrorCode.E1007, '项目周期仅1个工作日，结果仅供参考'));
   }
 
-  // Check required roles present
-  if (project.flow_mode === FlowMode.Standard) {
-    const required = project.enable_screen
-      ? [RoleType.Screen, RoleType.Label, RoleType.QA1, RoleType.QA2]
-      : [RoleType.Label, RoleType.QA1, RoleType.QA2];
-    for (const rt of required) {
+  // Check all roles in pipeline_roles have config
+  const pipelineRoles = project.pipeline_roles;
+  if (pipelineRoles && pipelineRoles.length > 0) {
+    for (const rt of pipelineRoles) {
       if (!roleConfigs.find(r => r.role_type === rt)) {
         errors.push(new AppError(ErrorCode.E2005, `缺少${rt}角色配置`));
       }
     }
   } else {
-    const required = project.enable_screen
-      ? [RoleType.Screen, RoleType.LabelQC, RoleType.QA2]
-      : [RoleType.LabelQC, RoleType.QA2];
-    for (const rt of required) {
-      if (!roleConfigs.find(r => r.role_type === rt)) {
-        errors.push(new AppError(ErrorCode.E2005, `缺少${rt}角色配置`));
-      }
-    }
+    errors.push(new AppError(ErrorCode.E2005, '缺少流程链配置(pipeline_roles)'));
   }
 
   // Gap sum check
