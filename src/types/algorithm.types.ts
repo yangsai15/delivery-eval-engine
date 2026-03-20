@@ -1,9 +1,9 @@
-import { FlowMode, RoleType, CalcType } from './enums';
+import { FlowMode } from './enums';
 
 /** 流程链中的环节定义 */
 export interface PipelineStage {
   index: number;        // 1-indexed position in pipeline
-  roleType: RoleType;
+  roleType: string;     // flexible role name (e.g. 'screen', 'label', 'qa1', custom)
   efficiency: number;   // daily_efficiency per person
   basePeople: number;   // base configured people
   isScreenStage: boolean;
@@ -21,6 +21,7 @@ export interface Pipeline {
   stages: PipelineStage[];
   gaps: PipelineGap[];
   flowMode: FlowMode;
+  pipelineRoles: string[];
   enableScreen: boolean;
   screenRate: number;   // R_screen (decimal 0-1)
   finalRate: number;    // R_final (decimal 0-1)
@@ -133,7 +134,7 @@ export interface CostSummary {
 
 /** 加班信息（用于引擎） */
 export interface OvertimeEntry {
-  roleType: RoleType;
+  roleType: string;
   date: string;       // YYYY-MM-DD
   overtimeDays: number;
   dateType: string;
@@ -141,7 +142,7 @@ export interface OvertimeEntry {
 
 /** 分阶段人力配置（用于引擎） */
 export interface StageEntry {
-  roleType: RoleType;
+  roleType: string;
   startDate: string;
   endDate: string;
   peopleNum: number;
