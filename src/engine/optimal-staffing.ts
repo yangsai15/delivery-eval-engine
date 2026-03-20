@@ -1,5 +1,4 @@
 import { Pipeline, SimulationInput, SimulationResult, StaffingResult, DailyPlanEntry, DailyCapacity } from '../types/algorithm.types';
-import { RoleType } from '../types/enums';
 import { runDailyRecursion, meetsDeliveryTarget } from './daily-recursion';
 import { getAvailableDays } from './pipeline-builder';
 
@@ -51,7 +50,7 @@ export function findOptimalStaffing(
   const availDays = getAvailableDays(pipeline, D);
 
   // Step 3: Initial estimate of minimum people
-  const peopleCounts = new Map<RoleType, number>();
+  const peopleCounts = new Map<string, number>();
   for (const stage of pipeline.stages) {
     const avail = availDays.get(stage.index) ?? D;
     if (avail <= 0) {
@@ -137,7 +136,7 @@ function buildOverrideCapacity(
   pipeline: Pipeline,
   D: number,
   baseCapacity: DailyCapacity[][],
-  peopleCounts: Map<RoleType, number>,
+  peopleCounts: Map<string, number>,
 ): DailyCapacity[][] {
   const stageCount = pipeline.stages.length;
   const cap: DailyCapacity[][] = Array.from({ length: stageCount + 1 }, () =>
