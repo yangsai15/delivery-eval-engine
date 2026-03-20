@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+build/
+coverage/
+*.db
+*.db-wal
+*.db-shm
+.env
