@@ -7,13 +7,11 @@ import { CostRepository } from '../db/repositories/cost.repository';
 import { ProjectRepository } from '../db/repositories/project.repository';
 import { FlowConfig, RoleConfig, StageConfig, OvertimeConfig, OvertimeRate } from '../types/project.types';
 import { CostConfig, StaffAllocation } from '../types/config.types';
-import { FlowMode, RoleType, ProjectStatus } from '../types/enums';
+import { ProjectStatus } from '../types/enums';
 import { AppError, ErrorCode } from '../types/error-codes';
 import {
   validateRoleConfig,
   validateFlowConfig,
-  validateRoleTypeForMode,
-  validateFlowNodeForMode,
   validateStageCoverage,
   validateOvertimeDates,
 } from './validation.service';
@@ -44,10 +42,6 @@ export class ConfigService {
       this.flowRepo.deleteByProject(projectId);
       const results: FlowConfig[] = [];
       for (const cfg of configs) {
-        // DC-02
-        if (!validateFlowNodeForMode(cfg.flow_node, project.flow_mode)) {
-          throw new AppError(ErrorCode.E1011, `流转节点${cfg.flow_node}与流程模式${project.flow_mode}不匹配`);
-        }
         const v = validateFlowConfig(cfg);
         if (!v.valid) throw v.errors[0];
 
@@ -65,32 +59,17 @@ export class ConfigService {
   // --- Role Config ---
 
   setRoleConfig(projectId: string, input: {
-    role_type: RoleType;
+    role_type: string;
     daily_efficiency: number;
     base_people: number;
     enable_stage?: boolean;
   }): RoleConfig {
     const project = this.getProjectOrThrow(projectId);
 
-    // DC-01
-    if (!validateRoleTypeForMode(input.role_type, project.flow_mode)) {
-      throw new AppError(ErrorCode.E1011, `角色${input.role_type}与流程模式${project.flow_mode}不匹配`);
-    }
-
     const v = validateRoleConfig(input);
     if (!v.valid) throw v.errors[0];
 
     return this.db.transaction(() => {
-      // Upsert: delete existing for this role type then create
-      const existing = this.roleRepo.getByProject(projectId).find(r => r.role_type === input.role_type);
-      if (existing) {
-        this.stageRepo.deleteByRoleId(existing.role_id);
-        this.roleRepo.deleteByProject(projectId);
-        // Re-create all except the one being updated
-        const others = this.roleRepo.getByProject(projectId);
-        // Actually, we need to be smarter - just update existing
-      }
-
       // Simple approach: check if exists and update or create
       const existingRoles = this.roleRepo.getByProject(projectId);
       const existingRole = existingRoles.find(r => r.role_type === input.role_type);
@@ -160,7 +139,7 @@ export class ConfigService {
   // --- Overtime Config ---
 
   setOvertimeConfigs(projectId: string, configs: Array<{
-    role_type: RoleType;
+    role_type: string;
     overtime_date: string;
     overtime_days: number;
     date_type: string;
