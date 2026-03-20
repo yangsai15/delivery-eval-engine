@@ -51,6 +51,7 @@ describe('Warning Engine', () => {
       ],
       gaps: [{ fromIndex: 1, toIndex: 2, gapDays: 5 }],
       flowMode: FlowMode.Standard,
+      pipelineRoles: [RoleType.Label, RoleType.QA2],
       enableScreen: false,
       screenRate: 1,
       finalRate: 1,
