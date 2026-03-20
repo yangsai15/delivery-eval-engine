@@ -2,6 +2,7 @@ import {
   validateProjectInput,
   validateRoleConfig,
   validateFlowConfig,
+  validatePipelineRoles,
   validateRoleTypeForMode,
   validateFlowNodeForMode,
   validateStageCoverage,
@@ -122,7 +123,31 @@ describe('Validation Service', () => {
     });
   });
 
-  describe('DC-01: validateRoleTypeForMode', () => {
+  describe('validatePipelineRoles', () => {
+    test('should reject less than 2 roles', () => {
+      expect(validatePipelineRoles(['label']).valid).toBe(false);
+      expect(validatePipelineRoles([]).valid).toBe(false);
+    });
+
+    test('should accept 2 or more roles', () => {
+      expect(validatePipelineRoles(['label', 'qa1']).valid).toBe(true);
+      expect(validatePipelineRoles(['screen', 'label', 'qa1', 'qa2']).valid).toBe(true);
+    });
+
+    test('should reject duplicate roles', () => {
+      expect(validatePipelineRoles(['label', 'label']).valid).toBe(false);
+    });
+
+    test('should reject empty role names', () => {
+      expect(validatePipelineRoles(['label', '']).valid).toBe(false);
+    });
+
+    test('should accept custom role names', () => {
+      expect(validatePipelineRoles(['screen', 'annotator', 'reviewer', 'acceptance']).valid).toBe(true);
+    });
+  });
+
+  describe('DC-01: validateRoleTypeForMode (legacy)', () => {
     test('standard mode should allow label, qa1, qa2, screen', () => {
       expect(validateRoleTypeForMode(RoleType.Label, FlowMode.Standard)).toBe(true);
       expect(validateRoleTypeForMode(RoleType.QA1, FlowMode.Standard)).toBe(true);
@@ -146,7 +171,7 @@ describe('Validation Service', () => {
     });
   });
 
-  describe('DC-02: validateFlowNodeForMode', () => {
+  describe('DC-02: validateFlowNodeForMode (legacy)', () => {
     test('standard mode flow nodes', () => {
       expect(validateFlowNodeForMode('label→qa1', FlowMode.Standard)).toBe(true);
       expect(validateFlowNodeForMode('qa1→qa2', FlowMode.Standard)).toBe(true);
