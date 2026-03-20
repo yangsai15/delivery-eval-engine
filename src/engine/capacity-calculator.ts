@@ -1,5 +1,4 @@
 import { DailyCapacity, Pipeline, StageEntry, OvertimeEntry } from '../types/algorithm.types';
-import { RoleType } from '../types/enums';
 
 /**
  * Build Cap[i][d] matrix for all stages and working days.
@@ -17,7 +16,7 @@ export function buildCapacityMatrix(
   workingDays: string[],
   stageEntries: StageEntry[],
   overtimeEntries: OvertimeEntry[],
-  overridePeople?: Map<RoleType, number>,
+  overridePeople?: Map<string, number>,
 ): DailyCapacity[][] {
   const D = workingDays.length;
   const stageCount = pipeline.stages.length;
@@ -33,7 +32,7 @@ export function buildCapacityMatrix(
   );
 
   // Build stage entry lookup: roleType -> sorted stages
-  const stageMap = new Map<RoleType, StageEntry[]>();
+  const stageMap = new Map<string, StageEntry[]>();
   for (const se of stageEntries) {
     const list = stageMap.get(se.roleType) ?? [];
     list.push(se);
@@ -41,7 +40,7 @@ export function buildCapacityMatrix(
   }
 
   // Build overtime lookup: roleType -> date -> overtime_days
-  const overtimeMap = new Map<RoleType, Map<string, number>>();
+  const overtimeMap = new Map<string, Map<string, number>>();
   for (const ot of overtimeEntries) {
     if (!overtimeMap.has(ot.roleType)) {
       overtimeMap.set(ot.roleType, new Map());
