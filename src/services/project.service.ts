@@ -9,7 +9,7 @@ import { SnapshotRepository } from '../db/repositories/snapshot.repository';
 import { Project } from '../types/project.types';
 import { FlowMode, ProjectStatus } from '../types/enums';
 import { AppError, ErrorCode } from '../types/error-codes';
-import { validateProjectInput, validateStateTransition } from './validation.service';
+import { validateProjectInput, validatePipelineRoles, validateStateTransition } from './validation.service';
 import { AuditService } from './audit.service';
 
 export class ProjectService {
@@ -43,12 +43,17 @@ export class ProjectService {
     total_data: number;
     start_date: string;
     end_date: string;
-    flow_mode: FlowMode;
+    flow_mode?: FlowMode;
+    pipeline_roles: string[];
     enable_screen?: boolean;
     screen_efficiency?: number;
     final_efficiency?: number;
     remark?: string;
   }): Project {
+    // Derive enable_screen from pipeline_roles
+    const pipelineRoles = input.pipeline_roles;
+    const enableScreen = pipelineRoles.length > 0 && pipelineRoles[0] === 'screen';
+
     // Validate
     const validation = validateProjectInput({
       project_name: input.project_name,
@@ -57,10 +62,16 @@ export class ProjectService {
       end_date: input.end_date,
       screen_efficiency: input.screen_efficiency,
       final_efficiency: input.final_efficiency ?? 100,
-      enable_screen: input.enable_screen ?? false,
+      enable_screen: enableScreen,
     });
     if (!validation.valid) {
       throw validation.errors[0];
+    }
+
+    // Validate pipeline_roles
+    const pipelineValidation = validatePipelineRoles(pipelineRoles);
+    if (!pipelineValidation.valid) {
+      throw pipelineValidation.errors[0];
     }
 
     // Check name uniqueness
@@ -77,8 +88,9 @@ export class ProjectService {
         total_data: input.total_data,
         start_date: input.start_date,
         end_date: input.end_date,
-        flow_mode: input.flow_mode,
-        enable_screen: input.enable_screen ?? false,
+        flow_mode: input.flow_mode ?? FlowMode.Standard,
+        pipeline_roles: pipelineRoles,
+        enable_screen: enableScreen,
         screen_efficiency: input.screen_efficiency ?? null,
         final_efficiency: input.final_efficiency ?? 100,
         enable_overtime: false,
