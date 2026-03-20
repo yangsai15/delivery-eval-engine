@@ -14,6 +14,7 @@ export const LABEL_QC_PROJECT = {
   start_date: '2026-04-01',
   end_date: '2026-04-14', // ~10 working days
   flow_mode: FlowMode.LabelQC,
+  pipeline_roles: [RoleType.Screen, RoleType.LabelQC, RoleType.QA2],
   enable_screen: true,
   screen_efficiency: 80,
   final_efficiency: 100,
@@ -31,6 +32,7 @@ export function buildLabelQCPipeline(): Pipeline {
       { fromIndex: 2, toIndex: 3, gapDays: 1 },
     ],
     flowMode: FlowMode.LabelQC,
+    pipelineRoles: [RoleType.Screen, RoleType.LabelQC, RoleType.QA2],
     enableScreen: true,
     screenRate: 0.8,
     finalRate: 1,
