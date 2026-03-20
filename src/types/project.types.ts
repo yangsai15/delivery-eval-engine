@@ -1,4 +1,4 @@
-import { FlowMode, ProjectStatus, RoleType, DateType } from './enums';
+import { FlowMode, ProjectStatus, DateType } from './enums';
 
 export interface Project {
   project_id: string;
@@ -9,6 +9,7 @@ export interface Project {
   start_date: string; // YYYY-MM-DD
   end_date: string;
   flow_mode: FlowMode;
+  pipeline_roles: string[];
   enable_screen: boolean;
   screen_efficiency: number | null; // (0, 100], null when screen disabled
   final_efficiency: number; // (0, 100]
@@ -42,7 +43,7 @@ export interface FlowConfig {
 export interface RoleConfig {
   role_id: string;
   project_id: string;
-  role_type: RoleType;
+  role_type: string; // flexible role name (e.g. 'screen', 'label', 'qa1', custom)
   daily_efficiency: number; // positive
   base_people: number; // positive integer ≥1
   enable_stage: boolean;
@@ -64,7 +65,7 @@ export interface StageConfig {
 export interface OvertimeConfig {
   overtime_id: string;
   project_id: string;
-  role_type: RoleType;
+  role_type: string; // flexible role name
   overtime_date: string;
   overtime_days: number; // positive decimal
   date_type: DateType;
