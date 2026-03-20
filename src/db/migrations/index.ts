@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import { up as migration001 } from './001_initial_schema';
+import { up as migration002 } from './002_flexible_pipeline';
 
 interface Migration {
   version: number;
@@ -9,6 +10,7 @@ interface Migration {
 
 const migrations: Migration[] = [
   { version: 1, name: '001_initial_schema', up: migration001 },
+  { version: 2, name: '002_flexible_pipeline', up: migration002 },
 ];
 
 /**
