@@ -214,14 +214,14 @@ export class CalculationService {
     const validation = validateCalculationReady(project, roleConfigs, flowConfigs, D);
     if (!validation.valid) throw validation.errors[0];
 
-    // Build pipeline
+    // Build pipeline from pipeline_roles
     const pipeline = buildPipeline(
-      project.flow_mode,
-      project.enable_screen,
+      project.pipeline_roles,
       project.screen_efficiency ?? 80,
       project.final_efficiency,
       roleConfigs,
       flowConfigs,
+      project.flow_mode,
     );
 
     // Load stage configs
