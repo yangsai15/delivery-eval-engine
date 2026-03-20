@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+  <title>数据标注需求交付评估计算工具</title>
+  <link rel="stylesheet" href="src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h1 class="app-title">交付评估工具</h1>
+        <span class="version">v1.0</span>
+      </div>
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-page="projects">
+          <span class="nav-icon">&#128196;</span>
+          <span>项目管理</span>
+        </button>
+        <button class="nav-item" data-page="calendar">
+          <span class="nav-icon">&#128197;</span>
+          <span>日历管理</span>
+        </button>
+        <button class="nav-item" data-page="templates">
+          <span class="nav-icon">&#128203;</span>
+          <span>报告模板</span>
+        </button>
+        <button class="nav-item" data-page="settings">
+          <span class="nav-icon">&#9881;</span>
+          <span>系统设置</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content" class="main-content">
+      <!-- Projects Page -->
+      <div id="page-projects" class="page active">
+        <div class="page-header">
+          <h2>项目列表</h2>
+          <button id="btn-new-project" class="btn btn-primary">+ 新建项目</button>
+        </div>
+        <div id="project-list" class="project-grid">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Project Detail Page -->
+      <div id="page-project-detail" class="page">
+        <div class="page-header">
+          <button id="btn-back" class="btn btn-ghost">&larr; 返回</button>
+          <h2 id="detail-title">项目详情</h2>
+          <div class="header-actions">
+            <button id="btn-calc-staffing" class="btn btn-primary">人力测算</button>
+            <button id="btn-calc-capacity" class="btn btn-secondary">产能测算</button>
+            <button id="btn-calc-eval" class="btn btn-secondary">综合评估</button>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <button class="tab active" data-tab="basic">基本信息</button>
+          <button class="tab" data-tab="flow">流程配置</button>
+          <button class="tab" data-tab="roles">角色配置</button>
+          <button class="tab" data-tab="overtime">加班配置</button>
+          <button class="tab" data-tab="cost">成本配置</button>
+          <button class="tab" data-tab="results">计算结果</button>
+        </div>
+
+        <div id="tab-content" class="tab-content">
+          <!-- Dynamically populated by JS -->
+        </div>
+      </div>
+
+      <!-- Calendar Page -->
+      <div id="page-calendar" class="page">
+        <div class="page-header">
+          <h2>日历管理</h2>
+        </div>
+        <div id="calendar-content">
+          <p class="placeholder-text">日历管理功能加载中...</p>
+        </div>
+      </div>
+
+      <!-- Templates Page -->
+      <div id="page-templates" class="page">
+        <div class="page-header">
+          <h2>报告模板</h2>
+        </div>
+        <div id="template-content">
+          <p class="placeholder-text">报告模板管理功能加载中...</p>
+        </div>
+      </div>
+
+      <!-- Settings Page -->
+      <div id="page-settings" class="page">
+        <div class="page-header">
+          <h2>系统设置</h2>
+        </div>
+        <div class="settings-section">
+          <h3>数据库信息</h3>
+          <div id="db-info"></div>
+          <button id="btn-backup" class="btn btn-secondary">导出备份</button>
+          <button id="btn-optimize" class="btn btn-ghost">优化数据库</button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div id="modal" class="modal">
+      <div class="modal-header">
+        <h3 id="modal-title"></h3>
+        <button id="modal-close" class="btn-close">&times;</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+      <div id="modal-footer" class="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="src/app.js"></script>
+</body>
+</html>
